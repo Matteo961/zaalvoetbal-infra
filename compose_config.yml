@@ -1,0 +1,99 @@
+ zaalvoetbal-nginx:
+    image: nginx:alpine
+    container_name: zaalvoetbal-nginx
+    restart: unless-stopped
+  
+    volumes:
+      - /var/www/zaalvoetbal_site:/var/www/zaalvoetbal_site:ro
+      - /home/matteo/zaalvoetbal/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  
+    networks:
+      - proxy
+  
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+  
+      # Router
+      - "traefik.http.routers.zaalvoetbal-site.rule=Host(`zaalvoetbal.info`)"
+      - "traefik.http.routers.zaalvoetbal-site.entrypoints=https"
+      - "traefik.http.routers.zaalvoetbal-site.tls=true"
+      - "traefik.http.routers.zaalvoetbal-site.middlewares=traefik-https-redirect@docker"
+      - "traefik.http.routers.zaalvoetbal-site.priority=1"
+  
+      # Service
+      - "traefik.http.services.zaalvoetbal-site.loadbalancer.server.port=80"
+
+  zaalvoetbal-api:
+    image: python:3.11.4-alpine
+    container_name: zaalvoetbal-api
+    restart: unless-stopped
+    volumes:
+      - /opt/voetbalAPI:/app
+    working_dir: /app
+    entrypoint: sh -c "/app/init.sh"
+    networks:
+      proxy:
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+      # Enable Traefik
+      - "traefik.enable=true"
+    
+      # Router
+      - "traefik.http.routers.voetbalapi.rule=Host(`zaalvoetbal.info`) && (Path(`/api-prod`) || PathPrefix(`/api-prod/`))"
+      - "traefik.http.routers.voetbalapi.entrypoints=https"
+      - "traefik.http.routers.voetbalapi.tls=true"
+      - "traefik.http.routers.voetbalapi.middlewares=traefik-https-redirect@docker"
+      - "traefik.http.routers.voetbalapi.priority=100"
+
+    
+      # Service
+      - "traefik.http.services.voetbalapi.loadbalancer.server.port=8000"
+
+  voetbalapi-runner:
+    # Built and pushed automatically by zaalvoetbal-infra's CI on any change
+    # to runner.Dockerfile. Watchtower (labeled below) keeps this pulled.
+    image: ghcr.io/matteo961/zaalvoetbal-gh-runner:latest
+    container_name: voetbalapi-runner
+    restart: unless-stopped
+    environment:
+      ACCESS_TOKEN: ${GH_RUNNER_PAT}
+      REPO_URL: https://github.com/Matteo961/voetbalAPI
+      RUNNER_NAME: voetbalapi-runner
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted,voetbalapi
+      RUNNER_WORKDIR: /_work
+      RUN_AS_ROOT: "true"
+      DISABLE_AUTO_UPDATE: "true"
+    volumes:
+      - /opt/voetbalAPI:/opt/voetbalAPI
+      - /opt/gh-runners/voetbalapi-work:/_work
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      # No traefik label: this container serves no HTTP traffic.
+      # Watchtower updates are rare (only on runner.Dockerfile changes) and
+      # would abort any job in flight at that moment - acceptable given how
+      # infrequently the base image actually changes.
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  voetbalwebsite-runner:
+    # Same auto-built image as voetbalapi-runner - see zaalvoetbal-infra.
+    image: ghcr.io/matteo961/zaalvoetbal-gh-runner:latest
+    container_name: voetbalwebsite-runner
+    restart: unless-stopped
+    environment:
+      ACCESS_TOKEN: ${GH_RUNNER_PAT}
+      REPO_URL: https://github.com/Matteo961/voetbalwebsite
+      RUNNER_NAME: voetbalwebsite-runner
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted,voetbalwebsite
+      RUNNER_WORKDIR: /_work
+      RUN_AS_ROOT: "true"
+      DISABLE_AUTO_UPDATE: "true"
+    volumes:
+      - /var/www/zaalvoetbal_site:/var/www/zaalvoetbal_site
+      - /opt/gh-runners/voetbalwebsite-work:/_work
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
