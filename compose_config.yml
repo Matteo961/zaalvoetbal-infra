@@ -29,6 +29,18 @@ services:
     image: python:3.12-alpine
     container_name: zaalvoetbal-api
     restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY}
+      SENDINBLUE_API_KEY: ${SENDINBLUE_API_KEY}
+      GRIP_URL: ${GRIP_URL}
+      DJANGO_STATIC_URL: ${DJANGO_STATIC_URL}
+      EVENTSTREAM_ALLOW_ORIGIN: ${EVENTSTREAM_ALLOW_ORIGIN}
+      FRONTEND_URL: ${FRONTEND_URL}
+      DJANGO_CORS_ORIGIN_REGEXES: ${DJANGO_CORS_ORIGIN_REGEXES}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
     volumes:
       - /opt/voetbalAPI:/app
     working_dir: /app
